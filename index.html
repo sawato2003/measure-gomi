@@ -3,14 +3,13 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5.0,user-scalable=yes" />
-<title>粗大ごみ寸法判定ツール（精密照準モード）</title>
+<title>粗大ごみ寸法判定ツール（完全オフセット対応）</title>
 <style>
   body{
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, "ヒラギノ角ゴ ProN", "Noto Sans JP", sans-serif;
     line-height: 1.6;
     margin: 0;
     background-color: #fff;
-    /* 選択時のハイライト無効化（長押し対策） */
     -webkit-user-select: none;
     user-select: none;
   }
@@ -22,7 +21,7 @@
   canvas{
     width:100%; height:auto; max-width:100%;
     border:1px dashed #bbb; border-radius:6px; background:#f8f8f8;
-    touch-action:none; /* ブラウザ標準のスクロール操作と干渉しないようにCanvas上では無効化 */
+    touch-action:none; 
   }
   button,input[type="file"]{ padding:8px 12px; font-size:14px; margin:2px 4px 2px 0; touch-action: manipulation; }
   .btn-row{ margin:4px 0; display:flex; flex-wrap:wrap; gap:4px; }
@@ -37,9 +36,9 @@
 <body>
 
 <div id="mainWrapper">
-  <h1>粗大ごみ寸法判定ツール（精密照準モード）</h1>
+  <h1>粗大ごみ寸法判定ツール（完全オフセット対応）</h1>
   <p class="muted">
-    <b>使い方：</b>「スケール指定」ボタンを押し、画面をなぞると<b>指の少し上に十字カーソル</b>が出ます。指を離すとその位置に点が打たれます（指で隠れません）。
+    <b>使い方：</b>スケール指定も、四角形の指定も、<b>指の少し上（約1.5cm上）</b>が操作位置になります。指で隠れずに精密な指定が可能です。
   </p>
 
   <div class="grid">
@@ -49,7 +48,7 @@
       <div class="btn-row">
         <button id="topScale">スケール指定 (指オフセット)</button>
         <button id="topAuto">自動抽出</button>
-        <button id="topManual">手動矩形</button>
+        <button id="topManual">手動矩形 (指オフセット)</button>
       </div>
       <div class="row">
         <div class="col">
@@ -68,7 +67,7 @@
       <div class="btn-row">
         <button id="sideScale">スケール指定 (指オフセット)</button>
         <button id="sideAuto">自動抽出</button>
-        <button id="sideManual">手動矩形</button>
+        <button id="sideManual">手動矩形 (指オフセット)</button>
       </div>
       <div class="row">
         <div class="col">
@@ -106,7 +105,6 @@ function loadToCanvas(file, canvasId, kind){
   var ctx = canvas.getContext("2d");
   var img = new Image();
   img.onload = function(){
-    // キャンバスサイズ調整（解像度確保）
     var maxW = 800, maxH = 800;
     var w = img.naturalWidth, h = img.naturalHeight;
     var s = Math.min(maxW/w, maxH/h);
@@ -147,42 +145,29 @@ function drawOverlay(kind){
     ctx.lineWidth=2;
     for(var i=0; i<points.length; i++){
       var p = points[i];
-      // 点
       ctx.fillStyle="#2b74ff";
       ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI*2); ctx.fill();
-      // 文字
       ctx.fillStyle="#fff"; ctx.strokeStyle="#000"; ctx.font="bold 14px sans-serif";
       ctx.strokeText(i+1, p.x+8, p.y-8);
       ctx.fillText(i+1, p.x+8, p.y-8);
     }
-    // 線
     if(points.length===2){
       ctx.strokeStyle="#2b74ff";
       ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y); ctx.lineTo(points[1].x, points[1].y); ctx.stroke();
     }
   }
 
-  // ドラッグ中の「照準カーソル」（十字 + 円）
-  if(st.aimingCursor){
+  // ドラッグ中の「照準カーソル」（スケールモード時のみ表示）
+  if(st.aimingCursor && st.mode === "scale"){
     var cx = st.aimingCursor.x;
     var cy = st.aimingCursor.y;
-    
-    // 十字線 (ピンクで見やすく)
-    ctx.strokeStyle = "#ff00ff";
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = "#ff00ff"; ctx.lineWidth = 2;
     ctx.beginPath();
     ctx.moveTo(cx - 20, cy); ctx.lineTo(cx + 20, cy);
     ctx.moveTo(cx, cy - 20); ctx.lineTo(cx, cy + 20);
     ctx.stroke();
-
-    // 中心円
-    ctx.beginPath();
-    ctx.arc(cx, cy, 15, 0, Math.PI*2);
-    ctx.stroke();
-    
-    // 中心点
-    ctx.fillStyle = "#ff00ff";
-    ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, 15, 0, Math.PI*2); ctx.stroke();
+    ctx.fillStyle = "#ff00ff"; ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI*2); ctx.fill();
   }
 
   // 矩形
@@ -193,12 +178,10 @@ function drawOverlay(kind){
 }
 
 // 座標取得 (オフセット機能付き)
-// isOffset: trueなら指の位置より60px上の座標を返す
 function getCanvasPoint(ev, canvas, isOffset){
   var rect = canvas.getBoundingClientRect();
   var clientX, clientY;
   
-  // タッチイベントかマウスか
   if(ev.touches && ev.touches.length>0){
     clientX = ev.touches[0].clientX;
     clientY = ev.touches[0].clientY;
@@ -210,7 +193,7 @@ function getCanvasPoint(ev, canvas, isOffset){
     clientY = ev.clientY;
   }
 
-  // ★ここで指のY座標をずらす（画面上のピクセルで60px上へ）
+  // ★指のY座標をずらす（矩形モードでも有効になります）
   if(isOffset){
     clientY = clientY - 60; 
   }
@@ -229,31 +212,31 @@ function setupCanvasEvents(kind){
   var canvas = $(kind+"Canvas");
   var st = S[kind];
   var isDragging = false;
-  var dragStart = null; // 矩形用
+  var dragStart = null; 
 
-  // --- タッチ操作 (スマホメイン) ---
+  // --- タッチ操作 (スマホ) ---
   
   canvas.addEventListener("touchstart", function(ev){
     ev.preventDefault();
     if(st.mode === "scale"){
-      // スケールモード：照準開始
-      st.aimingCursor = getCanvasPoint(ev, canvas, true); // ★true = オフセット有効
+      // スケールモード：オフセット有効(true)
+      st.aimingCursor = getCanvasPoint(ev, canvas, true); 
       drawOverlay(kind);
     } else if(st.mode === "manual"){
       isDragging = true;
-      dragStart = getCanvasPoint(ev, canvas, false); // 矩形描画は指の下でOK
+      // ★矩形モード：ここを true (オフセット有効) に変更しました
+      dragStart = getCanvasPoint(ev, canvas, true);
     }
   }, {passive:false});
 
   canvas.addEventListener("touchmove", function(ev){
     ev.preventDefault();
     if(st.mode === "scale"){
-      // スケールモード：照準移動
-      st.aimingCursor = getCanvasPoint(ev, canvas, true); // 指についてくる
+      st.aimingCursor = getCanvasPoint(ev, canvas, true);
       drawOverlay(kind);
     } else if(st.mode === "manual" && isDragging){
-      // 矩形描画
-      var cur = getCanvasPoint(ev, canvas, false);
+      // ★矩形モード：ここも true (オフセット有効) に変更しました
+      var cur = getCanvasPoint(ev, canvas, true);
       st.rect = {
         x: Math.min(dragStart.x, cur.x), y: Math.min(dragStart.y, cur.y),
         w: Math.abs(dragStart.x - cur.x), h: Math.abs(dragStart.y - cur.y)
@@ -265,11 +248,9 @@ function setupCanvasEvents(kind){
   canvas.addEventListener("touchend", function(ev){
     ev.preventDefault();
     if(st.mode === "scale" && st.aimingCursor){
-      // スケールモード：指を離した瞬間のカーソル位置で確定
       st.clicks.push(st.aimingCursor);
-      st.aimingCursor = null; // カーソル消す
+      st.aimingCursor = null; 
       if(st.clicks.length > 2) st.clicks.shift();
-      
       drawOverlay(kind);
       if(st.clicks.length === 2) commitScale(kind);
       
@@ -280,11 +261,11 @@ function setupCanvasEvents(kind){
     }
   }, {passive:false});
 
-  // --- マウス操作 (PC用フォールバック) ---
+  // --- マウス操作 (PC) ---
+  // PCはカーソルが見えるのでオフセットなし(false)のままにします
   
   canvas.addEventListener("mousedown", function(ev){
     if(st.mode === "scale"){
-      // クリックで即確定
       var p = getCanvasPoint(ev, canvas, false);
       st.clicks.push(p);
       if(st.clicks.length > 2) st.clicks.shift();
@@ -314,7 +295,7 @@ function setupCanvasEvents(kind){
   });
 }
 
-// 処理ロジック系
+// 処理ロジック
 function commitScale(kind){
   var st = S[kind];
   var a = st.clicks[0], b = st.clicks[1];

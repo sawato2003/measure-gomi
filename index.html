@@ -3,484 +3,379 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5.0,user-scalable=yes" />
-<title>粗大ごみ寸法判定（電話申込サポート版）</title>
+<title>粗大ごみ採寸サポート（電話回答用）</title>
 <style>
   body{
-    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "ヒラギノ角ゴ ProN", "Noto Sans JP", sans-serif;
-    line-height: 1.6; margin: 0; background-color: #f4f4f9;
-    -webkit-user-select: none; user-select: none;
+    font-family: system-ui, -apple-system, sans-serif;
+    line-height: 1.6; margin: 0; background-color: #f0f2f5;
+    user-select: none; -webkit-user-select: none;
   }
   #mainWrapper { padding: 16px; padding-bottom: 80px; max-width: 600px; margin: 0 auto; }
-  h1{ font-size:1.2rem; margin:0 0 12px; color:#333; text-align:center; }
+  h1{ font-size:1.2rem; margin:0 0 16px; color:#333; text-align:center; }
+  
+  /* タブ切り替えボタン */
+  .tab-group { display: flex; gap: 8px; margin-bottom: 16px; }
+  .tab-btn {
+    flex: 1; padding: 12px; border: none; border-radius: 8px;
+    background: #e4e6eb; color: #666; font-size: 1rem; font-weight: bold;
+    cursor: pointer; transition: all 0.2s; text-align: center;
+    border: 2px solid transparent;
+  }
+  .tab-btn.active {
+    background: #fff; color: #2b74ff; border-color: #2b74ff;
+    box-shadow: 0 2px 5px rgba(43,116,255,0.2);
+  }
   
   .panel{ 
     border:1px solid #ddd; border-radius:12px; padding:16px; margin-bottom:20px; 
-    background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+    background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   }
+  .hidden { display: none !important; }
+
   h2 { font-size: 1rem; margin-top: 0; border-bottom: 2px solid #eee; padding-bottom: 8px; margin-bottom: 12px; }
-  .row{ display:flex; flex-direction: column; gap:12px; }
   .col{ flex:1 1 100%; }
   
   canvas{
     width:100%; height:auto; display:block;
-    border:2px dashed #ccc; border-radius:8px; background:#f0f0f0;
-    touch-action:none; 
+    border:2px dashed #ccc; border-radius:8px; background:#fafafa;
+    touch-action:none; margin-bottom: 8px;
   }
   
   button, input[type="file"]::file-selector-button {
     background-color: #fff; border: 1px solid #ccc; border-radius: 6px;
     padding: 8px 12px; font-size: 14px; color: #333; cursor: pointer;
-    touch-action: manipulation; transition: all 0.2s;
+    touch-action: manipulation;
   }
   button:active { background-color: #eef; transform: translateY(1px); }
-  button#topScale, button#sideScale { border-color: #2b74ff; color: #2b74ff; font-weight: bold; }
+  button.tool-btn { border-color: #2b74ff; color: #2b74ff; font-weight: bold; }
   
-  .btn-row{ margin:8px 0; display:flex; flex-wrap:wrap; gap:8px; justify-content: center; }
+  .btn-row{ margin:8px 0; display:flex; flex-wrap:wrap; gap:12px; justify-content: center; }
+  
   .muted{ color:#666; font-size:0.85em; }
-  .pill{ display:inline-block; padding:2px 8px; border-radius:999px; background:#eee; margin-left:6px; font-size:0.8em; color:#555; }
   .result-text{ font-size:1.1rem; padding:4px 0; font-weight:bold; color:#0056b3; text-align: right; }
-  .small{ font-size:0.85em; color:#666; margin-top:4px; }
-  
-  /* --- 電話用カンペエリア --- */
-  #phoneSupportPanel {
-    border: 3px solid #ff9800; background-color: #fff8e1; 
+  .small{ font-size:0.85em; color:#666; }
+
+  /* 電話用メモエリア */
+  #memoPanel {
+    background-color: #fff8e1; border: 2px solid #ffb300; 
     text-align: center; position: relative;
   }
-  .memo-title {
-    background: #ff9800; color: white; display: inline-block;
-    padding: 4px 16px; border-radius: 99px; font-weight: bold; font-size: 0.9rem;
+  .memo-header {
+    background: #ffb300; color: #fff; display: inline-block;
+    padding: 4px 12px; border-radius: 99px; font-size: 0.85rem; font-weight: bold;
     margin-bottom: 12px;
   }
-  .script-box {
-    text-align: left; background: white; padding: 12px; border-radius: 8px;
-    border: 1px solid #ffcc80; margin-bottom: 12px;
+  .memo-row {
+    display: flex; justify-content: space-between; border-bottom: 1px dashed #ccc;
+    padding: 8px 0; font-size: 1.1rem;
   }
-  .script-line { font-size: 1.1rem; border-bottom: 1px dashed #eee; padding: 4px 0; }
-  .script-label { color: #666; font-size: 0.8em; display: inline-block; width: 60px; }
-  .script-val { font-weight: bold; font-size: 1.3em; color: #333; }
+  .memo-label { color: #666; }
+  .memo-val { font-weight: bold; color: #333; }
   
-  .total-highlight { background-color: #e3f2fd; padding: 8px; border-radius: 4px; margin-top: 8px; text-align: center; }
-  .total-label { color: #0d47a1; font-weight: bold; font-size: 0.9em; }
-  .total-val { color: #0d47a1; font-weight: 900; font-size: 1.6em; }
-  
-  /* 電話発信ボタン */
+  .total-box {
+    margin-top: 12px; background: #fff; padding: 12px; border-radius: 8px;
+    border: 2px solid #2b74ff;
+  }
+  .total-label { color: #2b74ff; font-size: 0.9rem; font-weight: bold; display: block; }
+  .total-val { font-size: 2.5rem; font-weight: 900; color: #333; line-height: 1.2; }
+  .unit { font-size: 1rem; font-weight: normal; color: #666; }
+
   .call-btn {
-    display: flex; align-items: center; justify-content: center; flex-direction: column;
-    width: 100%; padding: 12px 0; margin-top: 10px;
-    background-color: #00c853; color: white; font-weight: bold; font-size: 1.2rem;
+    display: block; width: 100%; padding: 14px 0; margin-top: 16px;
+    background-color: #28a745; color: white; font-weight: bold; font-size: 1.2rem;
     text-align: center; text-decoration: none; border-radius: 8px;
     box-shadow: 0 4px 6px rgba(0,0,0,0.15); border: none;
   }
-  .call-btn:active { background-color: #009624; transform: translateY(2px); box-shadow: none; }
-  .call-sub { font-size: 0.75rem; font-weight: normal; margin-top: 2px; }
-
-  .grid{ display:grid; grid-template-columns:1fr; gap:16px; }
-  @media (min-width:768px){ .grid{ grid-template-columns:1fr 1fr; } }
+  .call-sub { font-size: 0.75rem; font-weight: normal; display:block; margin-top: 2px;}
 </style>
 </head>
 <body>
 
 <div id="mainWrapper">
-  <h1>粗大ごみ寸法判定<br><span style="font-size:0.8em;color:#666">（電話申込サポートモード）</span></h1>
+  <h1>粗大ごみ採寸サポート</h1>
   
-  <p class="muted" style="text-align:center;">
-    写真で寸法を測ると、<b>電話で伝えるためのメモ</b>が自動作成されます。<br>
-    そのままセンターへ発信できます。
+  <div class="tab-group">
+    <button class="tab-btn active" onclick="switchMode('sum')">📦 3辺合計<br><span style="font-size:0.7rem">タンス・箱・棚</span></button>
+    <button class="tab-btn" onclick="switchMode('max')">📏 最大辺<br><span style="font-size:0.7rem">机・棒・その他</span></button>
+  </div>
+
+  <p class="muted" id="modeDesc" style="text-align:center;">
+    幅・奥行・高さを測り、合計を出します。
   </p>
 
-  <div class="grid">
-    <div class="panel">
-      <h2>① 上からの写真 (W / D)<span class="pill">TOP</span></h2>
-      <input type="file" id="topFile" accept="image/*" style="width:100%"/>
-      <div class="btn-row">
-        <button id="topScale">📏 スケール(指オフセット)</button>
-        <button id="topAuto">🤖 自動抽出</button>
-        <button id="topManual">👆 手動矩形(指オフセット)</button>
-      </div>
-      <div class="col">
-        <canvas id="topCanvas" width="640" height="480"></canvas>
-        <div class="small" id="topMsg">写真を選択してください</div>
-        <div class="result-text" id="topInfo">W: - / D: -</div>
-      </div>
+  <div class="panel" id="panelTop">
+    <h2 id="titleTop">① 上からの写真 (W / D)</h2>
+    <input type="file" id="topFile" accept="image/*" style="width:100%"/>
+    <div class="btn-row">
+      <button class="tool-btn" id="topScale">📏 スケール設定</button>
+      <button id="topManual">👆 手動指定</button>
     </div>
-
-    <div class="panel">
-      <h2>② 横からの写真 (H)<span class="pill">SIDE</span></h2>
-      <input type="file" id="sideFile" accept="image/*" style="width:100%"/>
-      <div class="btn-row">
-        <button id="sideScale">📏 スケール(指オフセット)</button>
-        <button id="sideAuto">🤖 自動抽出</button>
-        <button id="sideManual">👆 手動矩形(指オフセット)</button>
-      </div>
-      <div class="col">
-        <canvas id="sideCanvas" width="640" height="480"></canvas>
-        <div class="small" id="sideMsg">写真を選択してください</div>
-        <div class="result-text" id="sideInfo">H: -</div>
-      </div>
+    <div class="col">
+      <canvas id="topCanvas" width="640" height="480"></canvas>
+      <div class="small" id="topMsg">写真を選択してください</div>
+      <div class="result-text" id="topInfo">測定値: -</div>
     </div>
   </div>
 
-  <div class="panel" id="phoneSupportPanel">
-    <div class="memo-title">📞 電話オペレーターへの回答メモ</div>
+  <div class="panel" id="panelSide">
+    <h2>② 横からの写真 (高さ H)</h2>
+    <input type="file" id="sideFile" accept="image/*" style="width:100%"/>
+    <div class="btn-row">
+      <button class="tool-btn" id="sideScale">📏 スケール設定</button>
+      <button id="sideManual">👆 手動指定</button>
+    </div>
+    <div class="col">
+      <canvas id="sideCanvas" width="640" height="480"></canvas>
+      <div class="small" id="sideMsg">写真を選択してください</div>
+      <div class="result-text" id="sideInfo">H: -</div>
+    </div>
+  </div>
+
+  <div class="panel hidden" id="memoPanel">
+    <span class="memo-header">📞 オペレーターへの回答メモ</span>
     
-    <div id="scriptArea" style="display:none;">
-      <div class="script-box">
-        <div class="script-line">
-          <span class="script-label">幅(W)</span>
-          <span class="script-val" id="valW">---</span> cm
-        </div>
-        <div class="script-line">
-          <span class="script-label">奥行(D)</span>
-          <span class="script-val" id="valD">---</span> cm
-        </div>
-        <div class="script-line">
-          <span class="script-label">高さ(H)</span>
-          <span class="script-val" id="valH">---</span> cm
-        </div>
-        <div class="total-highlight">
-          <div class="total-label">聞かれたらこれを答える（3辺合計）</div>
-          <div class="total-val"><span id="valTotal">---</span> cm</div>
-          <div style="font-size:0.8em;color:#555;">(手数料目安: <span id="valFee">---</span>円)</div>
-        </div>
+    <div id="detailsBox" style="text-align:left; margin-bottom:8px;">
+      <div class="memo-row">
+        <span class="memo-label">幅 (W)</span><span class="memo-val" id="resW">-</span>
       </div>
-
-      <a href="tel:0570070053" class="call-btn">
-        📞 受付センターへ電話する
-        <span class="call-sub">携帯・スマホ用: 0570-07-0053</span>
-      </a>
-      <p class="muted" style="margin-top:8px;font-size:0.75em;">
-        受付: 月～土 9:00～17:00 (祝日も受付)<br>
-        ※固定電話からは <a href="tel:0120790053">0120-79-0053</a>
-      </p>
+      <div class="memo-row">
+        <span class="memo-label">奥行 (D)</span><span class="memo-val" id="resD">-</span>
+      </div>
+      <div class="memo-row" id="rowH">
+        <span class="memo-label">高さ (H)</span><span class="memo-val" id="resH">-</span>
+      </div>
     </div>
 
-    <div id="waitingMsg" style="padding:20px; color:#666;">
-      寸法を測定すると、ここに<br><b>「読み上げ用カンペ」</b>が表示されます
+    <div class="total-box">
+      <span class="total-label" id="answerLabel">聞かれたらこれを答える</span>
+      <span class="total-val" id="finalVal">0</span> <span class="unit">cm</span>
     </div>
+
+    <a href="tel:0570070053" class="call-btn">
+      📞 電話で申し込む
+      <span class="call-sub">携帯: 0570-07-0053 / 固定: 0120-79-0053</span>
+    </a>
+    <p class="muted" style="margin-top:8px;font-size:0.75em;">
+      ※品名とサイズを伝えてください。<br>
+      受付: 月～土 9:00～17:00 (祝日も受付)
+    </p>
   </div>
+
 </div>
 
-<script async src="https://docs.opencv.org/4.x/opencv.js" onload="console.log('OpenCV loaded')"></script>
 <script>
 var REAL_LEN_MM = 100; // 100mm基準
 function $(id){ return document.getElementById(id); }
 
-// 状態管理
+// currentMode: 'sum' (3辺合計) | 'max' (最大辺)
+var currentMode = 'sum';
+
 var S = {
   top:  { bg:null, mode:"idle", clicks:[], rect:null, scale:null, W:null, D:null, scalePoints:[], aimingCursor:null },
   side: { bg:null, mode:"idle", clicks:[], rect:null, scale:null, H:null, scalePoints:[], aimingCursor:null }
 };
 
-// --- Canvas基本処理 ---
+window.switchMode = function(mode){
+  currentMode = mode;
+  var tabs = document.querySelectorAll('.tab-btn');
+  tabs.forEach(t => t.classList.remove('active'));
+  
+  if(mode==='sum') tabs[0].classList.add('active');
+  else tabs[1].classList.add('active');
+
+  // UI切り替え
+  var panelSide = $('panelSide');
+  var titleTop = $('titleTop');
+  var desc = $('modeDesc');
+  var rowH = $('rowH');
+  var answerLabel = $('answerLabel');
+
+  if(mode === 'sum'){
+    panelSide.classList.remove('hidden');
+    rowH.classList.remove('hidden');
+    titleTop.textContent = "① 上からの写真 (W / D)";
+    desc.innerHTML = "タンスや箱など、<b>幅・奥行・高さの合計</b>を測ります。";
+    answerLabel.textContent = "3辺合計";
+  } else {
+    panelSide.classList.add('hidden'); 
+    rowH.classList.add('hidden');
+    titleTop.textContent = "① 真上からの写真";
+    desc.innerHTML = "机や棒など、<b>一番長い辺（または径）</b>を測ります。";
+    answerLabel.textContent = "最大サイズ";
+  }
+  calcResult();
+};
+
 function loadToCanvas(file, canvasId, kind){
   if(!file) return;
-  var canvas = $(canvasId);
-  var ctx = canvas.getContext("2d");
-  var img = new Image();
+  var canvas = $(canvasId); var ctx = canvas.getContext("2d"); var img = new Image();
   img.onload = function(){
-    var maxW = 800, maxH = 800;
-    var w = img.naturalWidth, h = img.naturalHeight;
+    var maxW = 800, maxH = 800; var w = img.naturalWidth, h = img.naturalHeight;
     var s = Math.min(maxW/w, maxH/h);
-    canvas.width = Math.round(w*s);
-    canvas.height = Math.round(h*s);
-    
+    canvas.width = Math.round(w*s); canvas.height = Math.round(h*s);
     ctx.drawImage(img,0,0,canvas.width,canvas.height);
     S[kind].bg = ctx.getImageData(0,0,canvas.width,canvas.height);
-    
-    // リセット
-    S[kind].mode = "idle";
-    S[kind].clicks = [];
-    S[kind].rect = null;
-    S[kind].scale = null;
-    S[kind].scalePoints = [];
-    S[kind].aimingCursor = null;
-    
+    S[kind].mode = "idle"; S[kind].clicks = []; S[kind].rect = null;
+    S[kind].scale = null; S[kind].scalePoints = []; S[kind].aimingCursor = null;
     if(kind==="top"){ S.top.W=null; S.top.D=null; } else { S.side.H=null; }
-    
-    $(kind+"Msg").innerHTML = "操作モードを選択してください";
-    updateInfo(kind);
-    drawOverlay(kind);
+    $(kind+"Msg").innerHTML = "スケール設定を行ってください";
+    updateInfo(kind); drawOverlay(kind);
   };
   var reader = new FileReader();
   reader.onload = function(e){ img.src = e.target.result; };
   reader.readAsDataURL(file);
 }
 
-// 描画ループ
 function drawOverlay(kind){
-  var canvas = $(kind+"Canvas");
-  var ctx = canvas.getContext("2d");
-  var st = S[kind];
-  
-  if(st.bg) ctx.putImageData(st.bg,0,0);
-  else ctx.clearRect(0,0,canvas.width,canvas.height);
+  var canvas = $(kind+"Canvas"); var ctx = canvas.getContext("2d"); var st = S[kind];
+  if(st.bg) ctx.putImageData(st.bg,0,0); else ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  // 確定点
   var points = (st.mode==="scale" && st.clicks.length>0) ? st.clicks : st.scalePoints;
   if(points){
     ctx.lineWidth=2;
     for(var i=0; i<points.length; i++){
       var p = points[i];
-      ctx.fillStyle="#2b74ff";
-      ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI*2); ctx.fill();
+      ctx.fillStyle="#2b74ff"; ctx.beginPath(); ctx.arc(p.x, p.y, 5, 0, Math.PI*2); ctx.fill();
       ctx.fillStyle="#fff"; ctx.strokeStyle="#000"; ctx.font="bold 14px sans-serif";
-      ctx.strokeText(i+1, p.x+8, p.y-8);
-      ctx.fillText(i+1, p.x+8, p.y-8);
+      ctx.strokeText(i+1, p.x+8, p.y-8); ctx.fillText(i+1, p.x+8, p.y-8);
     }
     if(points.length===2){
-      ctx.strokeStyle="#2b74ff";
-      ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y); ctx.lineTo(points[1].x, points[1].y); ctx.stroke();
+      ctx.strokeStyle="#2b74ff"; ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y); ctx.lineTo(points[1].x, points[1].y); ctx.stroke();
     }
   }
-
-  // 照準カーソル (オフセット表示)
   if(st.aimingCursor){
-    var cx = st.aimingCursor.x;
-    var cy = st.aimingCursor.y;
+    var cx = st.aimingCursor.x; var cy = st.aimingCursor.y;
     ctx.strokeStyle = "#ff00ff"; ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(cx - 20, cy); ctx.lineTo(cx + 20, cy);
-    ctx.moveTo(cx, cy - 20); ctx.lineTo(cx, cy + 20);
-    ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx-20, cy); ctx.lineTo(cx+20, cy); ctx.moveTo(cx, cy-20); ctx.lineTo(cx, cy+20); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, 15, 0, Math.PI*2); ctx.stroke();
-    ctx.fillStyle = "#ff00ff"; ctx.beginPath(); ctx.arc(cx, cy, 2, 0, Math.PI*2); ctx.fill();
   }
-
-  // 矩形
   if(st.rect){
-    ctx.strokeStyle="#ff3b30"; ctx.lineWidth=3;
-    ctx.strokeRect(st.rect.x, st.rect.y, st.rect.w, st.rect.h);
+    ctx.strokeStyle="#ff3b30"; ctx.lineWidth=3; ctx.strokeRect(st.rect.x, st.rect.y, st.rect.w, st.rect.h);
   }
 }
 
-// 座標取得 (オフセット機能付き)
-function getCanvasPoint(ev, canvas, isOffset){
-  var rect = canvas.getBoundingClientRect();
-  var clientX, clientY;
-  
-  if(ev.touches && ev.touches.length>0){
-    clientX = ev.touches[0].clientX;
-    clientY = ev.touches[0].clientY;
-  } else if(ev.changedTouches && ev.changedTouches.length>0){
-    clientX = ev.changedTouches[0].clientX;
-    clientY = ev.changedTouches[0].clientY;
-  } else {
-    clientX = ev.clientX;
-    clientY = ev.clientY;
-  }
-
-  if(isOffset){
-    clientY = clientY - 60; // 60px上にオフセット
-  }
-
-  var scaleX = canvas.width / rect.width;
-  var scaleY = canvas.height / rect.height;
-
-  return {
-    x: (clientX - rect.left) * scaleX,
-    y: (clientY - rect.top) * scaleY
-  };
+// 指オフセット 30px
+function getCanvasPoint(ev, canvas){
+  var rect = canvas.getBoundingClientRect(); var clientX, clientY;
+  if(ev.touches && ev.touches.length>0){ clientX = ev.touches[0].clientX; clientY = ev.touches[0].clientY; }
+  else if(ev.changedTouches && ev.changedTouches.length>0){ clientX = ev.changedTouches[0].clientX; clientY = ev.changedTouches[0].clientY; }
+  else { clientX = ev.clientX; clientY = ev.clientY; }
+  clientY -= 30; 
+  var scaleX = canvas.width/rect.width; var scaleY = canvas.height/rect.height;
+  return { x:(clientX-rect.left)*scaleX, y:(clientY-rect.top)*scaleY };
 }
 
-// イベント設定
 function setupCanvasEvents(kind){
-  var canvas = $(kind+"Canvas");
-  var st = S[kind];
-  var isDragging = false;
-  var dragStart = null; 
-
-  canvas.addEventListener("touchstart", function(ev){
+  var canvas = $(kind+"Canvas"); var st = S[kind];
+  var isDragging = false; var dragStart = null; 
+  var startHandler = function(ev){
     ev.preventDefault();
-    if(st.mode === "scale"){
-      st.aimingCursor = getCanvasPoint(ev, canvas, true); 
-      drawOverlay(kind);
-    } else if(st.mode === "manual"){
-      isDragging = true;
-      dragStart = getCanvasPoint(ev, canvas, true);
-    }
-  }, {passive:false});
-
-  canvas.addEventListener("touchmove", function(ev){
+    if(st.mode==="scale"){ st.aimingCursor=getCanvasPoint(ev, canvas); drawOverlay(kind); }
+    else if(st.mode==="manual"){ isDragging=true; dragStart=getCanvasPoint(ev, canvas); }
+  };
+  var moveHandler = function(ev){
     ev.preventDefault();
-    if(st.mode === "scale"){
-      st.aimingCursor = getCanvasPoint(ev, canvas, true);
-      drawOverlay(kind);
-    } else if(st.mode === "manual" && isDragging){
-      var cur = getCanvasPoint(ev, canvas, true);
-      st.rect = {
-        x: Math.min(dragStart.x, cur.x), y: Math.min(dragStart.y, cur.y),
-        w: Math.abs(dragStart.x - cur.x), h: Math.abs(dragStart.y - cur.y)
-      };
+    if(st.mode==="scale"){ st.aimingCursor=getCanvasPoint(ev, canvas); drawOverlay(kind); }
+    else if(st.mode==="manual" && isDragging){
+      var cur=getCanvasPoint(ev, canvas);
+      st.rect = { x:Math.min(dragStart.x, cur.x), y:Math.min(dragStart.y, cur.y), w:Math.abs(dragStart.x-cur.x), h:Math.abs(dragStart.y-cur.y) };
       drawOverlay(kind);
     }
-  }, {passive:false});
-
-  canvas.addEventListener("touchend", function(ev){
+  };
+  var endHandler = function(ev){
     ev.preventDefault();
-    if(st.mode === "scale" && st.aimingCursor){
-      st.clicks.push(st.aimingCursor);
-      st.aimingCursor = null; 
-      if(st.clicks.length > 2) st.clicks.shift();
-      drawOverlay(kind);
-      if(st.clicks.length === 2) commitScale(kind);
-    } else if(st.mode === "manual" && isDragging){
-      isDragging = false;
-      applyManualRect(kind);
-      drawOverlay(kind);
-    }
-  }, {passive:false});
-
-  canvas.addEventListener("mousedown", function(ev){
-    if(st.mode === "scale"){
-      var p = getCanvasPoint(ev, canvas, false);
-      st.clicks.push(p);
-      if(st.clicks.length > 2) st.clicks.shift();
-      drawOverlay(kind);
-      if(st.clicks.length === 2) commitScale(kind);
-    } else if(st.mode === "manual"){
-      isDragging = true;
-      dragStart = getCanvasPoint(ev, canvas, false);
-    }
-  });
-  
-  canvas.addEventListener("mousemove", function(ev){
-    if(st.mode==="manual" && isDragging){
-      var cur = getCanvasPoint(ev, canvas, false);
-      st.rect = {
-        x: Math.min(dragStart.x, cur.x), y: Math.min(dragStart.y, cur.y),
-        w: Math.abs(dragStart.x - cur.x), h: Math.abs(dragStart.y - cur.y)
-      };
-      drawOverlay(kind);
-    }
-  });
-
-  canvas.addEventListener("mouseup", function(){
-    if(st.mode==="manual" && isDragging){
-      isDragging = false; applyManualRect(kind); drawOverlay(kind);
-    }
-  });
+    if(st.mode==="scale" && st.aimingCursor){
+      st.clicks.push(st.aimingCursor); st.aimingCursor=null; if(st.clicks.length>2) st.clicks.shift();
+      drawOverlay(kind); if(st.clicks.length===2) commitScale(kind);
+    } else if(st.mode==="manual" && isDragging){ isDragging=false; applyManualRect(kind); drawOverlay(kind); }
+  };
+  canvas.addEventListener("touchstart", startHandler, {passive:false});
+  canvas.addEventListener("touchmove", moveHandler, {passive:false});
+  canvas.addEventListener("touchend", endHandler, {passive:false});
+  canvas.addEventListener("mousedown", startHandler);
+  canvas.addEventListener("mousemove", moveHandler);
+  canvas.addEventListener("mouseup", endHandler);
 }
 
-// ロジック
 function commitScale(kind){
-  var st = S[kind];
-  var a = st.clicks[0], b = st.clicks[1];
-  var dist = Math.sqrt(Math.pow(a.x-b.x,2)+Math.pow(a.y-b.y,2));
-  if(dist < 5){ alert("点が近すぎます"); st.clicks=[]; drawOverlay(kind); return; }
-  
-  st.scale = REAL_LEN_MM / dist;
-  st.scalePoints = [a, b];
-  st.clicks = [];
-  st.mode = "idle";
-  $(kind+"Msg").innerHTML = "スケール設定済。自動抽出か手動矩形を選んでください";
-  drawOverlay(kind);
-  updateInfo(kind);
+  var st=S[kind]; var a=st.clicks[0], b=st.clicks[1];
+  var dist=Math.sqrt(Math.pow(a.x-b.x,2)+Math.pow(a.y-b.y,2));
+  if(dist<5){ alert("点が近すぎます"); st.clicks=[]; drawOverlay(kind); return; }
+  st.scale=REAL_LEN_MM/dist; st.scalePoints=[a,b]; st.clicks=[]; st.mode="idle";
+  $(kind+"Msg").innerHTML="スケール設定完了"; drawOverlay(kind); updateInfo(kind);
 }
 
 function applyManualRect(kind){
-  var st = S[kind];
-  if(!st.rect || !st.scale) return;
-  if(kind==="top"){ st.W = st.rect.w * st.scale; st.D = st.rect.h * st.scale; }
-  else { st.H = st.rect.h * st.scale; }
+  var st=S[kind]; if(!st.rect || !st.scale) return;
+  if(kind==="top"){ st.W=st.rect.w*st.scale; st.D=st.rect.h*st.scale; }
+  else { st.H=st.rect.h*st.scale; }
   updateInfo(kind);
 }
 
-function autoExtract(kind){
-  var st = S[kind];
-  if(!st.scale){ alert("先にスケール指定をしてください"); return; }
-  if(!st.bg){ alert("画像がありません"); return; }
-  
-  var canvas = $(kind+"Canvas");
-  var src = cv.matFromImageData(st.bg);
-  var gray = new cv.Mat(), blur = new cv.Mat(), thr = new cv.Mat();
-  
-  cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
-  cv.GaussianBlur(gray, blur, new cv.Size(5,5), 0);
-  cv.adaptiveThreshold(blur, thr, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY_INV, 11, 2);
-  
-  var contours = new cv.MatVector();
-  var hierarchy = new cv.Mat();
-  cv.findContours(thr, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
-  
-  var maxArea=0, maxRect=null;
-  for(var i=0; i<contours.size(); i++){
-    var cnt = contours.get(i);
-    var area = cv.contourArea(cnt);
-    if(area > maxArea){
-      maxArea = area;
-      maxRect = cv.boundingRect(cnt);
+function updateInfo(kind){
+  var st=S[kind]; var el=$(kind+"Info");
+  if(kind==="top"){
+    if(currentMode === 'max'){
+      var maxVal = Math.max(st.W||0, st.D||0);
+      el.textContent = "最大: " + (maxVal>0 ? maxVal.toFixed(0) : "-") + " mm";
+    } else {
+      el.textContent = "W: "+(st.W?st.W.toFixed(0):"-")+" / D: "+(st.D?st.D.toFixed(0):"-")+" mm";
+    }
+  } else {
+    el.textContent = "H: "+(st.H?st.H.toFixed(0):"-")+" mm";
+  }
+  calcResult();
+}
+
+function calcResult(){
+  var W=S.top.W||0, D=S.top.D||0, H=S.side.H||0;
+  var memoPanel = $("memoPanel");
+  var finalVal = $("finalVal");
+  var resW = $("resW"); var resD = $("resD"); var resH = $("resH");
+
+  var isReady = false;
+  var finalCm = 0;
+
+  if(currentMode === 'sum'){
+    // 3辺合計モード
+    if(W>0 && D>0 && H>0){
+      var total = W+D+H;
+      finalCm = Math.round(total/10);
+      resW.textContent = Math.round(W/10) + "cm";
+      resD.textContent = Math.round(D/10) + "cm";
+      resH.textContent = Math.round(H/10) + "cm";
+      isReady = true;
+    }
+  } else {
+    // 最大辺モード (机など)
+    if(W>0 || D>0){
+      var maxVal = Math.max(W, D);
+      finalCm = Math.round(maxVal/10);
+      resW.textContent = Math.round(W/10) + "cm";
+      resD.textContent = Math.round(D/10) + "cm";
+      resH.textContent = "-"; // 高さ不要
+      isReady = true;
     }
   }
-  
-  if(maxRect && maxArea > 1000){
-    st.rect = { x:maxRect.x, y:maxRect.y, w:maxRect.width, h:maxRect.height };
-    applyManualRect(kind);
-    drawOverlay(kind);
+
+  if(isReady){
+    memoPanel.classList.remove('hidden');
+    finalVal.textContent = finalCm;
   } else {
-    alert("物体を自動検出できませんでした。手動で矩形を描いてください。");
-  }
-  
-  src.delete(); gray.delete(); blur.delete(); thr.delete(); contours.delete(); hierarchy.delete();
-}
-
-function updateInfo(kind){
-  var st = S[kind];
-  var el = $(kind+"Info");
-  if(kind==="top") el.textContent = "W: "+(st.W?st.W.toFixed(0):"-")+" / D: "+(st.D?st.D.toFixed(0):"-")+" mm";
-  else el.textContent = "H: "+(st.H?st.H.toFixed(0):"-")+" mm";
-  
-  updatePhoneScript();
-}
-
-// ★電話用カンペ更新ロジック
-function updatePhoneScript(){
-  var W=S.top.W||0, D=S.top.D||0, H=S.side.H||0;
-  var scriptArea = $("scriptArea");
-  var waitingMsg = $("waitingMsg");
-
-  if(W > 0 && D > 0 && H > 0){
-    var w_cm = Math.round(W/10);
-    var d_cm = Math.round(D/10);
-    var h_cm = Math.round(H/10);
-    var total_mm = W+D+H;
-    var total_cm = Math.ceil(total_mm/10); // 合計は切り上げ安全策
-
-    // 手数料推定 (大阪市サイズ基準)
-    var fee = 0;
-    if(total_mm < 1500) fee = 200;
-    else if(total_mm < 2000) fee = 400;
-    else if(total_mm < 2500) fee = 700;
-    else fee = 1000;
-
-    $("valW").textContent = w_cm;
-    $("valD").textContent = d_cm;
-    $("valH").textContent = h_cm;
-    $("valTotal").textContent = total_cm;
-    $("valFee").textContent = fee.toLocaleString();
-
-    waitingMsg.style.display = "none";
-    scriptArea.style.display = "block";
-  } else {
-    waitingMsg.style.display = "block";
-    scriptArea.style.display = "none";
+    memoPanel.classList.add('hidden');
   }
 }
 
 window.onload = function(){
   $("topFile").onchange = function(e){ loadToCanvas(e.target.files[0], "topCanvas", "top"); };
   $("sideFile").onchange = function(e){ loadToCanvas(e.target.files[0], "sideCanvas", "side"); };
+  $("topScale").onclick = function(){ S.top.mode="scale"; S.top.clicks=[]; $("topMsg").innerText="スケール紙の両端を指定"; drawOverlay("top"); };
+  $("sideScale").onclick = function(){ S.side.mode="scale"; S.side.clicks=[]; $("sideMsg").innerText="スケール紙の両端を指定"; drawOverlay("side"); };
+  $("topManual").onclick = function(){ S.top.mode="manual"; S.top.rect=null; $("topMsg").innerText="ドラッグして囲む"; drawOverlay("top"); };
+  $("sideManual").onclick = function(){ S.side.mode="manual"; S.side.rect=null; $("sideMsg").innerText="ドラッグして囲む"; drawOverlay("side"); };
   
-  $("topScale").onclick = function(){ S.top.mode="scale"; S.top.clicks=[]; $("topMsg").innerText="定規の端を指定(オフセット)"; drawOverlay("top"); };
-  $("sideScale").onclick = function(){ S.side.mode="scale"; S.side.clicks=[]; $("sideMsg").innerText="定規の端を指定(オフセット)"; drawOverlay("side"); };
-  
-  $("topManual").onclick = function(){ S.top.mode="manual"; S.top.rect=null; $("topMsg").innerText="ドラッグして囲む(オフセット)"; drawOverlay("top"); };
-  $("sideManual").onclick = function(){ S.side.mode="manual"; S.side.rect=null; $("sideMsg").innerText="ドラッグして囲む(オフセット)"; drawOverlay("side"); };
-  
-  $("topAuto").onclick = function(){ autoExtract("top"); };
-  $("sideAuto").onclick = function(){ autoExtract("side"); };
-  
-  setupCanvasEvents("top");
-  setupCanvasEvents("side");
+  setupCanvasEvents("top"); setupCanvasEvents("side");
+  switchMode('sum'); // 初期化
 };
 </script>
 </body>

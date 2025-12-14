@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5.0,user-scalable=yes" />
-<title>粗大ごみ採寸サポート（2点タップ式）</title>
+<title>粗大ごみ採寸サポート（枠プレビュー付）</title>
 <style>
   body{
     font-family: system-ui, -apple-system, sans-serif;
@@ -261,6 +261,22 @@ function drawOverlay(kind){
     if(st.mode==="scale" && points.length===2){
       ctx.strokeStyle="#2b74ff"; ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y); ctx.lineTo(points[1].x, points[1].y); ctx.stroke();
     }
+  }
+
+  // ★追加機能：手動指定中のプレビュー矩形 (1点目とカーソルを結ぶ枠)
+  if(st.mode === "manual" && st.clicks.length === 1 && st.aimingCursor){
+    var p1 = st.clicks[0];
+    var p2 = st.aimingCursor;
+    var rx = Math.min(p1.x, p2.x);
+    var ry = Math.min(p1.y, p2.y);
+    var rw = Math.abs(p1.x - p2.x);
+    var rh = Math.abs(p1.y - p2.y);
+
+    ctx.strokeStyle = "#ff3b30";
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]); // 点線
+    ctx.strokeRect(rx, ry, rw, rh);
+    ctx.setLineDash([]); // 実線に戻す
   }
 
   // カーソル

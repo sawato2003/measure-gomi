@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=5.0,user-scalable=yes" />
-<title>粗大ごみ採寸サポート（電話回答用）</title>
+<title>粗大ごみ採寸サポート（2点タップ式）</title>
 <style>
   body{
     font-family: system-ui, -apple-system, sans-serif;
@@ -215,9 +215,17 @@ function loadToCanvas(file, canvasId, kind){
     canvas.width = Math.round(w*s); canvas.height = Math.round(h*s);
     ctx.drawImage(img,0,0,canvas.width,canvas.height);
     S[kind].bg = ctx.getImageData(0,0,canvas.width,canvas.height);
-    S[kind].mode = "idle"; S[kind].clicks = []; S[kind].rect = null;
-    S[kind].scale = null; S[kind].scalePoints = []; S[kind].aimingCursor = null;
+    
+    // リセット
+    S[kind].mode = "idle"; 
+    S[kind].clicks = []; 
+    S[kind].rect = null;
+    S[kind].scale = null; 
+    S[kind].scalePoints = []; 
+    S[kind].aimingCursor = null;
+    
     if(kind==="top"){ S.top.W=null; S.top.D=null; } else { S.side.H=null; }
+    
     $(kind+"Msg").innerHTML = "スケール設定を行ってください";
     updateInfo(kind); drawOverlay(kind);
   };
@@ -230,8 +238,18 @@ function drawOverlay(kind){
   var canvas = $(kind+"Canvas"); var ctx = canvas.getContext("2d"); var st = S[kind];
   if(st.bg) ctx.putImageData(st.bg,0,0); else ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  var points = (st.mode==="scale" && st.clicks.length>0) ? st.clicks : st.scalePoints;
-  if(points){
+  // 定規 or 手動指定の「点」を描画
+  var points = [];
+  if(st.mode==="scale" || st.mode==="manual") {
+     points = (st.clicks.length > 0) ? st.clicks : [];
+     // スケール確定済みならそちらを表示
+     if(st.mode==="scale" && st.scalePoints.length>0) points = st.scalePoints;
+  } else {
+     // idle時など
+     if(st.scalePoints.length>0) points = st.scalePoints;
+  }
+
+  if(points.length > 0){
     ctx.lineWidth=2;
     for(var i=0; i<points.length; i++){
       var p = points[i];
@@ -239,16 +257,21 @@ function drawOverlay(kind){
       ctx.fillStyle="#fff"; ctx.strokeStyle="#000"; ctx.font="bold 14px sans-serif";
       ctx.strokeText(i+1, p.x+8, p.y-8); ctx.fillText(i+1, p.x+8, p.y-8);
     }
-    if(points.length===2){
+    // スケールの線
+    if(st.mode==="scale" && points.length===2){
       ctx.strokeStyle="#2b74ff"; ctx.beginPath(); ctx.moveTo(points[0].x, points[0].y); ctx.lineTo(points[1].x, points[1].y); ctx.stroke();
     }
   }
+
+  // カーソル
   if(st.aimingCursor){
     var cx = st.aimingCursor.x; var cy = st.aimingCursor.y;
     ctx.strokeStyle = "#ff00ff"; ctx.lineWidth = 2;
     ctx.beginPath(); ctx.moveTo(cx-20, cy); ctx.lineTo(cx+20, cy); ctx.moveTo(cx, cy-20); ctx.lineTo(cx, cy+20); ctx.stroke();
     ctx.beginPath(); ctx.arc(cx, cy, 15, 0, Math.PI*2); ctx.stroke();
   }
+
+  // 矩形（手動指定の確定後）
   if(st.rect){
     ctx.strokeStyle="#ff3b30"; ctx.lineWidth=3; ctx.strokeRect(st.rect.x, st.rect.y, st.rect.w, st.rect.h);
   }
@@ -267,49 +290,101 @@ function getCanvasPoint(ev, canvas){
 
 function setupCanvasEvents(kind){
   var canvas = $(kind+"Canvas"); var st = S[kind];
-  var isDragging = false; var dragStart = null; 
-  var startHandler = function(ev){
+  
+  // イベントハンドラ
+  var handleStart = function(ev){
+    if(st.mode==="idle") return;
     ev.preventDefault();
-    if(st.mode==="scale"){ st.aimingCursor=getCanvasPoint(ev, canvas); drawOverlay(kind); }
-    else if(st.mode==="manual"){ isDragging=true; dragStart=getCanvasPoint(ev, canvas); }
+    st.aimingCursor = getCanvasPoint(ev, canvas);
+    drawOverlay(kind);
   };
-  var moveHandler = function(ev){
+
+  var handleMove = function(ev){
+    if(st.mode==="idle") return;
     ev.preventDefault();
-    if(st.mode==="scale"){ st.aimingCursor=getCanvasPoint(ev, canvas); drawOverlay(kind); }
-    else if(st.mode==="manual" && isDragging){
-      var cur=getCanvasPoint(ev, canvas);
-      st.rect = { x:Math.min(dragStart.x, cur.x), y:Math.min(dragStart.y, cur.y), w:Math.abs(dragStart.x-cur.x), h:Math.abs(dragStart.y-cur.y) };
+    st.aimingCursor = getCanvasPoint(ev, canvas);
+    drawOverlay(kind);
+  };
+
+  var handleEnd = function(ev){
+    if(st.mode==="idle") return;
+    ev.preventDefault();
+    if(st.aimingCursor){
+      st.clicks.push(st.aimingCursor);
+      st.aimingCursor = null; 
+      
+      // 3点目以上なら古いのを消す（やり直し）
+      if(st.clicks.length > 2) st.clicks.shift();
+
       drawOverlay(kind);
+
+      // 2点たまったら確定処理
+      if(st.clicks.length === 2){
+        if(st.mode === "scale") commitScale(kind);
+        else if(st.mode === "manual") applyManualRect(kind);
+      }
     }
   };
-  var endHandler = function(ev){
-    ev.preventDefault();
-    if(st.mode==="scale" && st.aimingCursor){
-      st.clicks.push(st.aimingCursor); st.aimingCursor=null; if(st.clicks.length>2) st.clicks.shift();
-      drawOverlay(kind); if(st.clicks.length===2) commitScale(kind);
-    } else if(st.mode==="manual" && isDragging){ isDragging=false; applyManualRect(kind); drawOverlay(kind); }
-  };
-  canvas.addEventListener("touchstart", startHandler, {passive:false});
-  canvas.addEventListener("touchmove", moveHandler, {passive:false});
-  canvas.addEventListener("touchend", endHandler, {passive:false});
-  canvas.addEventListener("mousedown", startHandler);
-  canvas.addEventListener("mousemove", moveHandler);
-  canvas.addEventListener("mouseup", endHandler);
+
+  // Touch
+  canvas.addEventListener("touchstart", handleStart, {passive:false});
+  canvas.addEventListener("touchmove", handleMove, {passive:false});
+  canvas.addEventListener("touchend", handleEnd, {passive:false});
+  // Mouse
+  canvas.addEventListener("mousedown", handleStart);
+  canvas.addEventListener("mousemove", handleMove);
+  canvas.addEventListener("mouseup", handleEnd);
 }
 
 function commitScale(kind){
   var st=S[kind]; var a=st.clicks[0], b=st.clicks[1];
   var dist=Math.sqrt(Math.pow(a.x-b.x,2)+Math.pow(a.y-b.y,2));
   if(dist<5){ alert("点が近すぎます"); st.clicks=[]; drawOverlay(kind); return; }
-  st.scale=REAL_LEN_MM/dist; st.scalePoints=[a,b]; st.clicks=[]; st.mode="idle";
-  $(kind+"Msg").innerHTML="スケール設定完了"; drawOverlay(kind); updateInfo(kind);
+  
+  st.scale=REAL_LEN_MM/dist; 
+  st.scalePoints=[a,b]; 
+  st.clicks=[]; 
+  st.mode="idle"; // 設定終わったらidleへ
+  
+  $(kind+"Msg").innerHTML="スケール設定完了"; 
+  drawOverlay(kind); 
+  updateInfo(kind);
 }
 
 function applyManualRect(kind){
-  var st=S[kind]; if(!st.rect || !st.scale) return;
-  if(kind==="top"){ st.W=st.rect.w*st.scale; st.D=st.rect.h*st.scale; }
-  else { st.H=st.rect.h*st.scale; }
+  var st=S[kind]; 
+  
+  // スケール未設定なら警告
+  if(!st.scale){ 
+    alert("先に「スケール設定」を行ってください");
+    st.clicks = [];
+    st.mode = "idle";
+    drawOverlay(kind);
+    return;
+  }
+
+  // 2点から矩形を生成
+  var p1 = st.clicks[0];
+  var p2 = st.clicks[1];
+  st.rect = {
+    x: Math.min(p1.x, p2.x),
+    y: Math.min(p1.y, p2.y),
+    w: Math.abs(p1.x - p2.x),
+    h: Math.abs(p1.y - p2.y)
+  };
+
+  // サイズ計算
+  if(kind==="top"){ 
+    st.W = st.rect.w * st.scale; 
+    st.D = st.rect.h * st.scale; 
+  } else { 
+    st.H = st.rect.h * st.scale; 
+  }
+
+  st.clicks = [];
+  st.mode = "idle"; // 完了したらidleへ
   updateInfo(kind);
+  drawOverlay(kind);
 }
 
 function updateInfo(kind){
@@ -366,16 +441,21 @@ function calcResult(){
   }
 }
 
+// 初期化
 window.onload = function(){
+  // ボタン操作
+  $("topScale").onclick = function(){ S.top.mode="scale"; S.top.clicks=[]; $("topMsg").innerText="スケール紙の両端(2点)をタップ"; drawOverlay("top"); };
+  $("sideScale").onclick = function(){ S.side.mode="scale"; S.side.clicks=[]; $("sideMsg").innerText="スケール紙の両端(2点)をタップ"; drawOverlay("side"); };
+  
+  $("topManual").onclick = function(){ S.top.mode="manual"; S.top.rect=null; S.top.clicks=[]; $("topMsg").innerText="対角線の両端(2点)をタップ"; drawOverlay("top"); };
+  $("sideManual").onclick = function(){ S.side.mode="manual"; S.side.rect=null; S.side.clicks=[]; $("sideMsg").innerText="対角線の両端(2点)をタップ"; drawOverlay("side"); };
+  
+  // ファイル読込
   $("topFile").onchange = function(e){ loadToCanvas(e.target.files[0], "topCanvas", "top"); };
   $("sideFile").onchange = function(e){ loadToCanvas(e.target.files[0], "sideCanvas", "side"); };
-  $("topScale").onclick = function(){ S.top.mode="scale"; S.top.clicks=[]; $("topMsg").innerText="スケール紙の両端を指定"; drawOverlay("top"); };
-  $("sideScale").onclick = function(){ S.side.mode="scale"; S.side.clicks=[]; $("sideMsg").innerText="スケール紙の両端を指定"; drawOverlay("side"); };
-  $("topManual").onclick = function(){ S.top.mode="manual"; S.top.rect=null; $("topMsg").innerText="ドラッグして囲む"; drawOverlay("top"); };
-  $("sideManual").onclick = function(){ S.side.mode="manual"; S.side.rect=null; $("sideMsg").innerText="ドラッグして囲む"; drawOverlay("side"); };
   
   setupCanvasEvents("top"); setupCanvasEvents("side");
-  switchMode('sum'); // 初期化
+  switchMode('sum'); 
 };
 </script>
 </body>
